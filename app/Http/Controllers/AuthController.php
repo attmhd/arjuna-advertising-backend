@@ -15,20 +15,62 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
             $token = $user->createToken("authToken")->plainTextToken;
+            $roles = $user->getRoleNames();
 
             return response()->json([
-                "user" => $user,
-                "token" => $token,
+                "success" => true,
+                "message" => "Login successful",
+                "data" => [
+                    "user" => $user,
+                    "roles" => $roles,
+                    "token" => $token,
+                ],
             ]);
         }
 
-        return response()->json(["message" => "Unauthorized"], 401);
+        return response()->json(
+            [
+                "success" => false,
+                "message" => "Unauthorized",
+                "data" => null,
+            ],
+            401,
+        );
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
 
-        return response()->json(["message" => "Logged out"]);
+        if (!$user) {
+            return response()->json(
+                [
+                    "success" => false,
+                    "message" => "Unauthorized",
+                    "data" => null,
+                ],
+                401,
+            );
+        }
+
+        // Opsional: jika ingin logout dari semua device, kirim param "all=true"
+        if ($request->boolean("all")) {
+            $user->tokens()->delete();
+            $message = "Logged out from all devices";
+        } else {
+            $token = $user->currentAccessToken();
+            if ($token) {
+                $token->delete();
+                $message = "Logged out";
+            } else {
+                $message = "No active token found";
+            }
+        }
+
+        return response()->json([
+            "success" => true,
+            "message" => $message,
+            "data" => null,
+        ]);
     }
 }
