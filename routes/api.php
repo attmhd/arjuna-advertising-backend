@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\SumberPelangganController;
 
 Route::get("/hello", function () {
     return response()->json("Hello World");
@@ -21,3 +22,4 @@ Route::middleware("auth:sanctum")->group(function () {
 Route::apiResource("/user", UserController::class);
 Route::apiResource("/unit", UnitController::class);
 Route::apiResource("/inventory", InventoryController::class);
+Route::apiResource("/sumber-pelanggan", SumberPelangganController::class);

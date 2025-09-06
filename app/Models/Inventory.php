@@ -15,6 +15,7 @@ class Inventory extends Model
         "quality",
         "unit_id",
         "stock",
+        "price",
     ];
 
     protected static function boot()
@@ -28,11 +29,7 @@ class Inventory extends Model
 
         static::created(function ($inventory) {
             $tahun = date("Y");
-            $kode =
-                "INV-" .
-                $tahun .
-                "-" .
-                str_pad($inventory->id, 3, "0", STR_PAD_LEFT);
+            $kode = "ITM-" . str_pad($inventory->id, 3, "0", STR_PAD_LEFT);
 
             $inventory->kode_inventory = $kode;
             $inventory->save();

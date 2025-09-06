@@ -12,13 +12,16 @@ return new class extends Migration {
     {
         Schema::create("inventory", function (Blueprint $table) {
             $table->id();
-            $table->string("kode_inventory")->unique()->nullable();
+            $table->string("kode_inventory")->unique()->nullable(); // biarkan nullable kalau mau isi setelah dapat ID
             $table->string("product_name");
             $table->string("type");
             $table->string("quality");
-            $table->foreignId("unit_id")->constrained("units");
-            $table->float("stock");
+            $table->foreignId("unit_id")->constrained("units"); // RESTRICT lebih aman daripada CASCADE
+            $table->decimal("stock", 12, 3)->default(0); // ganti float -> decimal
+            $table->decimal("price", 12, 3)->default(0);
             $table->timestamps();
+
+            $table->index(["product_name", "type"]); // opsional, buat pencarian cepat
         });
     }
 
