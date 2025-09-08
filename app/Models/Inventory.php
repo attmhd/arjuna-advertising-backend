@@ -40,4 +40,9 @@ class Inventory extends Model
     {
         return $this->belongsTo(Unit::class, "unit_id");
     }
+
+    public function invoiceItems()
+    {
+        return $this->hasMany(InvoiceItem::class);
+    }
 }

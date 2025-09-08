@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SumberPelangganController;
+use App\Http\Controllers\InvoiceController;
 
 Route::get("/hello", function () {
     return response()->json("Hello World");
@@ -15,11 +16,22 @@ Route::get("/hello", function () {
 Route::post("/login", [AuthController::class, "login"]);
 
 // Lindungi endpoint berikut dengan Sanctum
-Route::middleware("auth:sanctum")->group(function () {
+Route::middleware("auth:api")->group(function () {
     Route::post("/logout", [AuthController::class, "logout"]);
-});
 
-Route::apiResource("/user", UserController::class);
-Route::apiResource("/unit", UnitController::class);
-Route::apiResource("/inventory", InventoryController::class);
-Route::apiResource("/sumber-pelanggan", SumberPelangganController::class);
+    // Routes for Karyawan (and Admin)
+    Route::middleware("role:karyawan|admin")->group(function () {
+        Route::apiResource("/invoice", InvoiceController::class);
+        Route::apiResource("/inventory", InventoryController::class);
+    });
+
+    // Routes for Admin only
+    Route::middleware("role:admin")->group(function () {
+        Route::apiResource("/user", UserController::class);
+        Route::apiResource("/unit", UnitController::class);
+        Route::apiResource(
+            "/sumber-pelanggan",
+            SumberPelangganController::class,
+        );
+    });
+});
