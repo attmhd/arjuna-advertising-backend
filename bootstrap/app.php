@@ -21,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             "role_or_permission" =>
                 \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
+
+        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (

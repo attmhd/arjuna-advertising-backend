@@ -9,8 +9,8 @@ class Invoice extends Model
     protected $fillable = [
         "invoice_number",
         "customer_name",
-        "source_id",
-        "status_id",
+        "source",
+        "status",
         "issue_date",
         "due_date",
         "discount",

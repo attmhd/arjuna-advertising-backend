@@ -14,13 +14,13 @@ return new class extends Migration {
             $table->id();
             $table->string("invoice_number")->unique();
             $table->string("customer_name");
-            $table->foreignId("source_id")->constrained("sumber_pelanggans");
+            $table->string("sumber_pelanggan");
             $table->dateTime("issue_date")->default(now());
             $table->date("due_date");
             $table->decimal("discount")->default(0);
             $table->boolean("tax_enabled")->default(false);
             $table->decimal("grand_total")->default(0);
-            $table->foreignId("status_id")->constrained("invoice_statuses");
+            $table->string("invoice_statuse")->default("Tertunda");
             $table->timestamps();
         });
     }

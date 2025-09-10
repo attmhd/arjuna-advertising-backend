@@ -12,8 +12,8 @@ class RoleAndPermissionSeeder extends Seeder
     public function run(): void
     {
         // Buat role
-        $adminRole = Role::firstOrCreate(["name" => "admin"]);
-        $karyawanRole = Role::firstOrCreate(["name" => "karyawan"]);
+        $adminRole = Role::firstOrCreate(["name" => "Admin"]);
+        $karyawanRole = Role::firstOrCreate(["name" => "Staf"]);
 
         // (opsional) Buat permission
         $permissions = ["manage users", "manage transaksi", "view laporan"];

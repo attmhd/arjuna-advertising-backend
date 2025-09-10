@@ -13,14 +13,8 @@ class InventoryController extends Controller
     public function index()
     {
         try {
-            $inventories = Inventory::with("unit:id,unit_name")
-                ->get()
-                ->map(function ($inventory) {
-                    $data = $inventory->toArray();
-                    $data["unit_name"] = $inventory->unit->unit_name ?? null;
-                    unset($data["unit_id"], $data["unit"]);
-                    return $data;
-                });
+            $inventories = Inventory::all();
+
             return response()->json(
                 [
                     "status" => "success",

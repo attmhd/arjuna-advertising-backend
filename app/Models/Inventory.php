@@ -13,9 +13,8 @@ class Inventory extends Model
         "product_name",
         "type",
         "quality",
-        "unit_id",
+        "unit",
         "stock",
-        "price",
     ];
 
     protected static function boot()
@@ -34,11 +33,6 @@ class Inventory extends Model
             $inventory->kode_inventory = $kode;
             $inventory->save();
         });
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(Unit::class, "unit_id");
     }
 
     public function invoiceItems()

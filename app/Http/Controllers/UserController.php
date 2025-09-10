@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
@@ -14,7 +14,13 @@ class UserController extends Controller
     public function index()
     {
         try {
-            $users = User::where("id", "!=", 1)->get();
+            $users = User::with("roles")
+                ->get()
+                ->map(function ($user) {
+                    $user->role = $user->getRoleNames()->first();
+                    unset($user->roles);
+                    return $user;
+                });
             return response()->json(
                 [
                     "status" => "success",
@@ -45,8 +51,31 @@ class UserController extends Controller
     public function store(Request $request)
     {
         try {
-            $user = User::create($request->all());
-            $user->assignRole("karyawan");
+            $validate_user = Validator::make($request->all(), [
+                "name" => "required|string|max:255",
+                "email" => "required|email|unique:users,email",
+                "password" => "required|string|min:5",
+                "role" => "required|string|exists:roles,name",
+            ]);
+
+            if ($validate_user->fails()) {
+                return response()->json(
+                    [
+                        "status" => "error",
+                        "message" => $validate_user->errors()->first(),
+                    ],
+                    422,
+                );
+            }
+
+            $user = User::create([
+                "name" => $request->name,
+                "email" => $request->email,
+                "password" => bcrypt($request->password),
+            ]);
+
+            $user->assignRole($request->role);
+
             return response()->json(
                 [
                     "status" => "success",
@@ -73,6 +102,8 @@ class UserController extends Controller
     {
         try {
             $user = User::findOrFail($id);
+            $user->role = $user->getRoleNames()->first();
+
             return response()->json(
                 [
                     "status" => "success",

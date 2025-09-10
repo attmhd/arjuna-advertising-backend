@@ -16,9 +16,8 @@ return new class extends Migration {
             $table->string("product_name");
             $table->string("type");
             $table->string("quality");
-            $table->foreignId("unit_id")->constrained("units"); // RESTRICT lebih aman daripada CASCADE
+            $table->string("unit"); // RESTRICT lebih aman daripada CASCADE
             $table->decimal("stock", 12, 3)->default(0); // ganti float -> decimal
-            $table->decimal("price", 12, 3)->default(0);
             $table->timestamps();
 
             $table->index(["product_name", "type"]); // opsional, buat pencarian cepat

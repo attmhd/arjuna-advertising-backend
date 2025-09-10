@@ -20,18 +20,13 @@ Route::middleware("auth:api")->group(function () {
     Route::post("/logout", [AuthController::class, "logout"]);
 
     // Routes for Karyawan (and Admin)
-    Route::middleware("role:karyawan|admin")->group(function () {
+    Route::middleware("role:Staf|Admin")->group(function () {
         Route::apiResource("/invoice", InvoiceController::class);
         Route::apiResource("/inventory", InventoryController::class);
     });
 
     // Routes for Admin only
-    Route::middleware("role:admin")->group(function () {
+    Route::middleware("role:Admin")->group(function () {
         Route::apiResource("/user", UserController::class);
-        Route::apiResource("/unit", UnitController::class);
-        Route::apiResource(
-            "/sumber-pelanggan",
-            SumberPelangganController::class,
-        );
     });
 });
