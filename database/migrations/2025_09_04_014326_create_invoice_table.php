@@ -10,17 +10,18 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create("invoice", function (Blueprint $table) {
+        Schema::create("invoices", function (Blueprint $table) {
             $table->id();
-            $table->string("invoice_number")->unique();
+            $table->string("invoice_number")->unique()->nullable();
             $table->string("customer_name");
-            $table->string("sumber_pelanggan");
-            $table->dateTime("issue_date")->default(now());
+            $table->string("source");
+            $table->dateTime("issue_date");
             $table->date("due_date");
-            $table->decimal("discount")->default(0);
+            $table->decimal("discount", 15, 2)->default(0);
+            $table->decimal("down_payment", 15, 2)->default(0);
             $table->boolean("tax_enabled")->default(false);
-            $table->decimal("grand_total")->default(0);
-            $table->string("invoice_statuse")->default("Tertunda");
+            $table->decimal("grand_total", 15, 2)->default(0);
+            $table->string("status");
             $table->timestamps();
         });
     }
@@ -30,6 +31,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists("invoice");
+        Schema::dropIfExists("invoices");
     }
 };

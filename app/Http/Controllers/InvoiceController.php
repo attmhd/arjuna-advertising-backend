@@ -51,12 +51,16 @@ class InvoiceController extends Controller
     {
         $request->validate([
             "customer_name" => "required|string",
-            "source_id" => "required|exists:sumber_pelanggans,id",
+            "source" => "required|string",
             "due_date" => "required|date",
-            "status_id" => "required|exists:invoice_statuses,id",
+            "status" => "required|string",
             "items" => "required|array",
             "items.*.inventory_id" => "required|exists:inventory,id",
             "items.*.quantity" => "required|integer|min:1",
+            "items.*.price" => "required|numeric|min:0",
+            "discount" => "nullable|numeric|min:0",
+            "down_payment" => "nullable|numeric|min:0",
+            "tax_enabled" => "nullable|boolean",
         ]);
 
         try {
@@ -64,18 +68,27 @@ class InvoiceController extends Controller
 
             $invoice = Invoice::create([
                 "customer_name" => $request->customer_name,
-                "source_id" => $request->source_id,
+                "source" => $request->source,
                 "issue_date" => now(),
                 "due_date" => $request->due_date,
-                "discount" => $request->discount ?? 0,
-                "tax_enabled" => $request->tax_enabled ?? false,
-                "status_id" => $request->status_id,
+                "discount" => $request->input("discount", 0),
+                "down_payment" => $request->input("down_payment", 0),
+                "tax_enabled" => $request->input("tax_enabled", false),
+                "status" => $request->status,
             ]);
 
-            $grandTotal = 0;
+            $subTotalItems = 0;
 
             foreach ($request->items as $itemData) {
                 $inventory = Inventory::find($itemData["inventory_id"]);
+
+                if (!$inventory) {
+                    throw new \Exception(
+                        "Inventory item with ID: " .
+                            $itemData["inventory_id"] .
+                            " not found.",
+                    );
+                }
 
                 if ($inventory->stock < $itemData["quantity"]) {
                     throw new \Exception(
@@ -84,23 +97,32 @@ class InvoiceController extends Controller
                     );
                 }
 
-                $subTotal = $inventory->price * $itemData["quantity"];
+                $subTotal = $itemData["price"] * $itemData["quantity"];
 
                 InvoiceItem::create([
                     "invoice_id" => $invoice->id,
                     "inventory_id" => $inventory->id,
                     "quantity" => $itemData["quantity"],
-                    "price" => $inventory->price,
+                    "price" => $itemData["price"],
                     "sub_total" => $subTotal,
                 ]);
 
                 $inventory->stock -= $itemData["quantity"];
                 $inventory->save();
 
-                $grandTotal += $subTotal;
+                $subTotalItems += $subTotal;
             }
 
-            $invoice->grand_total = $grandTotal;
+            // Calculate grand total
+            $totalAfterDiscount = $subTotalItems - $invoice->discount;
+            $taxAmount = $invoice->tax_enabled ? $totalAfterDiscount * 0.11 : 0;
+            $invoice->grand_total = $totalAfterDiscount + $taxAmount;
+
+            // Validate down payment doesn't exceed grand total
+            if ($invoice->down_payment > $invoice->grand_total) {
+                throw new \Exception("Down payment cannot exceed grand total");
+            }
+
             $invoice->save();
 
             DB::commit();
@@ -165,12 +187,16 @@ class InvoiceController extends Controller
     {
         $request->validate([
             "customer_name" => "sometimes|required|string",
-            "source_id" => "sometimes|required|exists:sumber_pelanggans,id",
+            "source" => "sometimes|required|string",
             "due_date" => "sometimes|required|date",
-            "status_id" => "sometimes|required|exists:invoice_statuses,id",
+            "status" => "sometimes|required|string",
             "items" => "sometimes|array",
-            "items.*.inventory_id" => "required|exists:inventory,id",
-            "items.*.quantity" => "required|integer|min:1",
+            "items.*.inventory_id" => "required_with:items|exists:inventory,id",
+            "items.*.quantity" => "required_with:items|integer|min:1",
+            "items.*.price" => "required_with:items|numeric|min:0",
+            "discount" => "nullable|numeric|min:0",
+            "down_payment" => "nullable|numeric|min:0",
+            "tax_enabled" => "nullable|boolean",
         ]);
 
         try {
@@ -180,10 +206,11 @@ class InvoiceController extends Controller
             $invoice->update(
                 $request->only([
                     "customer_name",
-                    "source_id",
+                    "source",
                     "due_date",
-                    "status_id",
+                    "status",
                     "discount",
+                    "down_payment",
                     "tax_enabled",
                 ]),
             );
@@ -206,8 +233,16 @@ class InvoiceController extends Controller
                 // Items to add or update
                 foreach ($newItems as $itemData) {
                     $inventory = Inventory::find($itemData["inventory_id"]);
-                    $oldItem = $oldItems->get($inventory->id);
 
+                    if (!$inventory) {
+                        throw new \Exception(
+                            "Inventory item with ID: " .
+                                $itemData["inventory_id"] .
+                                " not found.",
+                        );
+                    }
+
+                    $oldItem = $oldItems->get($inventory->id);
                     $newQuantity = $itemData["quantity"];
 
                     if ($oldItem) {
@@ -220,8 +255,10 @@ class InvoiceController extends Controller
                             );
                         }
                         $inventory->stock -= $quantityDiff;
+
                         $oldItem->quantity = $newQuantity;
-                        $oldItem->sub_total = $inventory->price * $newQuantity;
+                        $oldItem->price = $itemData["price"];
+                        $oldItem->sub_total = $itemData["price"] * $newQuantity;
                         $oldItem->save();
                     } else {
                         // Add new item
@@ -235,8 +272,8 @@ class InvoiceController extends Controller
                             "invoice_id" => $invoice->id,
                             "inventory_id" => $inventory->id,
                             "quantity" => $newQuantity,
-                            "price" => $inventory->price,
-                            "sub_total" => $inventory->price * $newQuantity,
+                            "price" => $itemData["price"],
+                            "sub_total" => $itemData["price"] * $newQuantity,
                         ]);
                         $inventory->stock -= $newQuantity;
                     }
@@ -246,7 +283,16 @@ class InvoiceController extends Controller
 
             // Recalculate grand total
             $invoice->refresh(); // Refresh to get the latest items
-            $invoice->grand_total = $invoice->items()->sum("sub_total");
+            $subTotalItems = $invoice->items()->sum("sub_total");
+            $totalAfterDiscount = $subTotalItems - $invoice->discount;
+            $taxAmount = $invoice->tax_enabled ? $totalAfterDiscount * 0.11 : 0;
+            $invoice->grand_total = $totalAfterDiscount + $taxAmount;
+
+            // Validate down payment doesn't exceed grand total
+            if ($invoice->down_payment > $invoice->grand_total) {
+                throw new \Exception("Down payment cannot exceed grand total");
+            }
+
             $invoice->save();
 
             DB::commit();

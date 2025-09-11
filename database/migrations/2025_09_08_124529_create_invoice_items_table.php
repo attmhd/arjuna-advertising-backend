@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table
                 ->foreignId("invoice_id")
-                ->constrained("invoice")
+                ->constrained("invoices")
                 ->onDelete("cascade");
             $table
                 ->foreignId("inventory_id")

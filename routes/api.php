@@ -6,8 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\InventoryController;
-use App\Http\Controllers\SumberPelangganController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\StatisticsController;
 
 Route::get("/hello", function () {
     return response()->json("Hello World");
@@ -28,5 +28,14 @@ Route::middleware("auth:api")->group(function () {
     // Routes for Admin only
     Route::middleware("role:Admin")->group(function () {
         Route::apiResource("/user", UserController::class);
+        // Statistics routes
+        Route::get("/statistics/invoice-summary", [
+            StatisticsController::class,
+            "invoiceSummary",
+        ]);
+        Route::get("/statistics/invoice-report", [
+            StatisticsController::class,
+            "invoiceReport",
+        ]);
     });
 });
