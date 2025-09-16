@@ -12,11 +12,17 @@ return new class extends Migration {
     {
         Schema::create("invoices", function (Blueprint $table) {
             $table->id();
+            $table
+                ->foreignId("user_id")
+                ->constrained("users")
+                ->onDelete("cascade");
             $table->string("invoice_number")->unique()->nullable();
             $table->string("customer_name");
             $table->string("source");
+            $table->string("customer_phone");
+            $table->string("description");
             $table->dateTime("issue_date");
-            $table->date("due_date");
+            $table->date("due_date")->nullable();
             $table->decimal("discount", 15, 2)->default(0);
             $table->decimal("down_payment", 15, 2)->default(0);
             $table->boolean("tax_enabled")->default(false);

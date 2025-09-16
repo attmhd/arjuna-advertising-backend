@@ -16,11 +16,47 @@ class InvoiceController extends Controller
     public function index()
     {
         try {
-            $invoices = Invoice::with("items")->get();
+            // tampilkan invoices dengan pagination 10 data per halaman
+            $invoices = Invoice::with(["items", "user"])->paginate(10);
+
             return response()->json(
                 [
                     "status" => "success",
-                    "data" => $invoices,
+                    "data" => collect($invoices->items())->map(function (
+                        $invoice,
+                    ) {
+                        return [
+                            "id" => $invoice->id,
+                            "invoice_number" => $invoice->invoice_number,
+                            "user_name" => $invoice->user
+                                ? $invoice->user->name
+                                : null,
+                            "customer_name" => $invoice->customer_name,
+                            "customer_phone" => $invoice->customer_phone,
+                            "description" => $invoice->description,
+                            "source" => $invoice->source,
+                            "issue_date" => $invoice->issue_date,
+                            "due_date" => $invoice->due_date,
+                            "discount" => $invoice->discount,
+                            "down_payment" => $invoice->down_payment,
+                            "tax_enabled" => $invoice->tax_enabled,
+                            "status" => $invoice->status,
+                            "grand_total" => $invoice->grand_total,
+                            "remaining_payment" => $invoice->remaining_payment,
+                            "created_at" => $invoice->created_at,
+                            "updated_at" => $invoice->updated_at,
+                            "items" => $invoice->items,
+                        ];
+                    }),
+                    "pagination" => [
+                        "current_page" => $invoices->currentPage(),
+                        "per_page" => $invoices->perPage(),
+                        "total" => $invoices->total(),
+                        "last_page" => $invoices->lastPage(),
+                        "from" => $invoices->firstItem(),
+                        "to" => $invoices->lastItem(),
+                        "has_more_pages" => $invoices->hasMorePages(),
+                    ],
                     "message" => "Invoices retrieved successfully",
                 ],
                 200,
@@ -51,6 +87,8 @@ class InvoiceController extends Controller
     {
         $request->validate([
             "customer_name" => "required|string",
+            "customer_phone" => "required|string",
+            "description" => "required|string",
             "source" => "required|string",
             "due_date" => "required|date",
             "status" => "required|string",
@@ -67,7 +105,10 @@ class InvoiceController extends Controller
             DB::beginTransaction();
 
             $invoice = Invoice::create([
+                "user_id" => $request->user()->id, // atau auth()->id()
                 "customer_name" => $request->customer_name,
+                "customer_phone" => $request->customer_phone,
+                "description" => $request->description,
                 "source" => $request->source,
                 "issue_date" => now(),
                 "due_date" => $request->due_date,
@@ -124,13 +165,35 @@ class InvoiceController extends Controller
             }
 
             $invoice->save();
+            $invoice->load(["items", "user"]);
 
             DB::commit();
 
             return response()->json(
                 [
                     "status" => "success",
-                    "data" => $invoice->load("items"),
+                    "data" => [
+                        "id" => $invoice->id,
+                        "invoice_number" => $invoice->invoice_number,
+                        "user_name" => $invoice->user
+                            ? $invoice->user->name
+                            : null,
+                        "customer_name" => $invoice->customer_name,
+                        "customer_phone" => $invoice->customer_phone,
+                        "description" => $invoice->description,
+                        "source" => $invoice->source,
+                        "issue_date" => $invoice->issue_date,
+                        "due_date" => $invoice->due_date,
+                        "discount" => $invoice->discount,
+                        "down_payment" => $invoice->down_payment,
+                        "tax_enabled" => $invoice->tax_enabled,
+                        "status" => $invoice->status,
+                        "grand_total" => $invoice->grand_total,
+                        "remaining_payment" => $invoice->remaining_payment,
+                        "created_at" => $invoice->created_at,
+                        "updated_at" => $invoice->updated_at,
+                        "items" => $invoice->items,
+                    ],
                     "message" => "Invoice created successfully",
                 ],
                 201,
@@ -153,10 +216,33 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         try {
+            $invoice->load(["items", "user"]);
+
             return response()->json(
                 [
                     "status" => "success",
-                    "data" => $invoice->load("items"),
+                    "data" => [
+                        "id" => $invoice->id,
+                        "invoice_number" => $invoice->invoice_number,
+                        "user_name" => $invoice->user
+                            ? $invoice->user->name
+                            : null,
+                        "customer_name" => $invoice->customer_name,
+                        "customer_phone" => $invoice->customer_phone,
+                        "description" => $invoice->description,
+                        "source" => $invoice->source,
+                        "issue_date" => $invoice->issue_date,
+                        "due_date" => $invoice->due_date,
+                        "discount" => $invoice->discount,
+                        "down_payment" => $invoice->down_payment,
+                        "tax_enabled" => $invoice->tax_enabled,
+                        "status" => $invoice->status,
+                        "grand_total" => $invoice->grand_total,
+                        "remaining_payment" => $invoice->remaining_payment,
+                        "created_at" => $invoice->created_at,
+                        "updated_at" => $invoice->updated_at,
+                        "items" => $invoice->items,
+                    ],
                     "message" => "Invoice retrieved successfully",
                 ],
                 200,
@@ -186,7 +272,10 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         $request->validate([
+            "user_id" => "sometimes|required|exists:users,id",
             "customer_name" => "sometimes|required|string",
+            "customer_phone" => "sometimes|required|string",
+            "description" => "sometimes|required|string",
             "source" => "sometimes|required|string",
             "due_date" => "sometimes|required|date",
             "status" => "sometimes|required|string",
@@ -205,7 +294,10 @@ class InvoiceController extends Controller
             // Update invoice details
             $invoice->update(
                 $request->only([
+                    "user_id",
                     "customer_name",
+                    "customer_phone",
+                    "description",
                     "source",
                     "due_date",
                     "status",
@@ -294,13 +386,35 @@ class InvoiceController extends Controller
             }
 
             $invoice->save();
+            $invoice->load(["items", "user"]);
 
             DB::commit();
 
             return response()->json(
                 [
                     "status" => "success",
-                    "data" => $invoice->load("items"),
+                    "data" => [
+                        "id" => $invoice->id,
+                        "invoice_number" => $invoice->invoice_number,
+                        "user_name" => $invoice->user
+                            ? $invoice->user->name
+                            : null,
+                        "customer_name" => $invoice->customer_name,
+                        "customer_phone" => $invoice->customer_phone,
+                        "description" => $invoice->description,
+                        "source" => $invoice->source,
+                        "issue_date" => $invoice->issue_date,
+                        "due_date" => $invoice->due_date,
+                        "discount" => $invoice->discount,
+                        "down_payment" => $invoice->down_payment,
+                        "tax_enabled" => $invoice->tax_enabled,
+                        "status" => $invoice->status,
+                        "grand_total" => $invoice->grand_total,
+                        "remaining_payment" => $invoice->remaining_payment,
+                        "created_at" => $invoice->created_at,
+                        "updated_at" => $invoice->updated_at,
+                        "items" => $invoice->items,
+                    ],
                     "message" => "Invoice updated successfully",
                 ],
                 200,

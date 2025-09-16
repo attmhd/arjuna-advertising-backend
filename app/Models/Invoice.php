@@ -12,8 +12,11 @@ class Invoice extends Model
     protected $table = "invoices";
 
     protected $fillable = [
+        "user_id",
         "customer_name",
         "source",
+        "customer_phone",
+        "description",
         "status",
         "issue_date",
         "due_date",
@@ -81,5 +84,13 @@ class Invoice extends Model
             return 0;
         }
         return ($this->down_payment / $this->grand_total) * 100;
+    }
+
+    /**
+     * Get the user who created the invoice
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

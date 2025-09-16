@@ -13,12 +13,22 @@ class InventoryController extends Controller
     public function index()
     {
         try {
-            $inventories = Inventory::all();
+            // tampilkan inventory dengan pagination 10 data per halaman
+            $inventories = Inventory::paginate(10);
 
             return response()->json(
                 [
                     "status" => "success",
-                    "data" => $inventories,
+                    "data" => $inventories->items(),
+                    "pagination" => [
+                        "current_page" => $inventories->currentPage(),
+                        "per_page" => $inventories->perPage(),
+                        "total" => $inventories->total(),
+                        "last_page" => $inventories->lastPage(),
+                        "from" => $inventories->firstItem(),
+                        "to" => $inventories->lastItem(),
+                        "has_more_pages" => $inventories->hasMorePages(),
+                    ],
                     "message" => "Inventory list retrieved successfully",
                 ],
                 200,
