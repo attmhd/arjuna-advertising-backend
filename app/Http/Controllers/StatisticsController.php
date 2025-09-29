@@ -126,15 +126,16 @@ class StatisticsController extends Controller
     }
 
     /**
-     * Get detailed invoice report statistics
+     * Get detailed invoice report statistics with support for all periods
      */
     public function invoiceReport(Request $request)
     {
         try {
             $period = $request->get("period", "thisMonth");
+            $selectedDate = $request->get("date");
 
-            // Determine date range based on period
-            $dateRange = $this->getDateRange($period);
+            // Determine date range based on period and selected date
+            $dateRange = $this->getDateRange($period, $selectedDate);
             $startDate = $dateRange["start"];
             $endDate = $dateRange["end"];
 
@@ -189,12 +190,6 @@ class StatisticsController extends Controller
                 ->first();
 
             $topProduct = $topProductQuery ? $topProductQuery->name : null;
-
-            // Weekly income (only for monthly periods)
-            $weeklyIncome = [];
-            if (in_array($period, ["thisMonth", "lastMonth"])) {
-                $weeklyIncome = $this->getWeeklyIncome($startDate, $endDate);
-            }
 
             // Product sales in the period
             $productSales = DB::table("invoice_items")
@@ -251,14 +246,45 @@ class StatisticsController extends Controller
                     ];
                 });
 
-            return response()->json([
+            // Prepare response data based on period
+            $responseData = [
                 "total_income" => (int) $totalIncome,
                 "total_receivable" => (int) $totalReceivable,
                 "top_product" => $topProduct,
-                "weekly_income" => $weeklyIncome,
                 "product_sales" => $productSales,
                 "invoices" => $invoices,
-            ]);
+            ];
+
+            // Add period-specific data
+            switch ($period) {
+                case "today":
+                    $responseData["hourly_income"] = $this->getHourlyIncome(
+                        $startDate,
+                        $endDate,
+                    );
+                    break;
+                case "thisWeek":
+                    $responseData["daily_income"] = $this->getDailyIncome(
+                        $startDate,
+                        $endDate,
+                    );
+                    break;
+                case "thisMonth":
+                case "lastMonth":
+                    $responseData["weekly_income"] = $this->getWeeklyIncome(
+                        $startDate,
+                        $endDate,
+                    );
+                    break;
+                case "thisYear":
+                    $responseData["monthly_income"] = $this->getMonthlyIncome(
+                        $startDate,
+                        $endDate,
+                    );
+                    break;
+            }
+
+            return response()->json($responseData);
         } catch (\Exception $e) {
             return response()->json(
                 [
@@ -272,32 +298,106 @@ class StatisticsController extends Controller
     }
 
     /**
-     * Get date range based on period parameter
+     * Get date range based on period parameter and selected date
      */
-    private function getDateRange($period)
+    private function getDateRange($period, $selectedDate = null)
     {
+        $baseDate = $selectedDate
+            ? Carbon::parse($selectedDate)
+            : Carbon::now();
+
         switch ($period) {
+            case "today":
+                return [
+                    "start" => $baseDate->copy()->startOfDay(),
+                    "end" => $baseDate->copy()->endOfDay(),
+                ];
+            case "thisWeek":
+                return [
+                    "start" => $baseDate->copy()->startOfWeek(Carbon::MONDAY),
+                    "end" => $baseDate->copy()->endOfWeek(Carbon::SUNDAY),
+                ];
+            case "thisMonth":
+                return [
+                    "start" => $baseDate->copy()->startOfMonth(),
+                    "end" => $baseDate->copy()->endOfMonth(),
+                ];
             case "lastMonth":
                 return [
-                    "start" => Carbon::now()->subMonth()->startOfMonth(),
-                    "end" => Carbon::now()->subMonth()->endOfMonth(),
+                    "start" => $baseDate->copy()->subMonth()->startOfMonth(),
+                    "end" => $baseDate->copy()->subMonth()->endOfMonth(),
                 ];
             case "thisYear":
                 return [
-                    "start" => Carbon::now()->startOfYear(),
-                    "end" => Carbon::now()->endOfYear(),
+                    "start" => $baseDate->copy()->startOfYear(),
+                    "end" => $baseDate->copy()->endOfYear(),
                 ];
-            case "thisMonth":
             default:
                 return [
-                    "start" => Carbon::now()->startOfMonth(),
-                    "end" => Carbon::now()->endOfMonth(),
+                    "start" => $baseDate->copy()->startOfMonth(),
+                    "end" => $baseDate->copy()->endOfMonth(),
                 ];
         }
     }
 
     /**
-     * Get weekly income for a given date range
+     * Get hourly income for today period (24 hours with 2-hour intervals)
+     */
+    private function getHourlyIncome($startDate, $endDate)
+    {
+        // Initialize 12 time slots (00:00, 02:00, 04:00, ..., 22:00)
+        $hourlyIncome = array_fill(0, 12, 0);
+
+        $invoices = Invoice::whereBetween("created_at", [$startDate, $endDate])
+            ->whereNotIn("status", [
+                "cancelled",
+                "draft",
+                "dibatalkan",
+                "konsep",
+            ])
+            ->select("created_at", "grand_total")
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            $hour = Carbon::parse($invoice->created_at)->hour;
+            $slotIndex = intval($hour / 2); // Group into 2-hour slots
+
+            if ($slotIndex >= 0 && $slotIndex < 12) {
+                $hourlyIncome[$slotIndex] += $invoice->grand_total;
+            }
+        }
+
+        return array_map("intval", $hourlyIncome);
+    }
+
+    /**
+     * Get daily income for thisWeek period (7 days)
+     */
+    private function getDailyIncome($startDate, $endDate)
+    {
+        // Initialize 7 days (Monday to Sunday)
+        $dailyIncome = array_fill(0, 7, 0);
+
+        $invoices = Invoice::whereBetween("issue_date", [$startDate, $endDate])
+            ->whereNotIn("status", [
+                "cancelled",
+                "draft",
+                "dibatalkan",
+                "konsep",
+            ])
+            ->select("issue_date", "grand_total")
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            $dayOfWeek = Carbon::parse($invoice->issue_date)->dayOfWeekIso; // 1=Monday, 7=Sunday
+            $dailyIncome[$dayOfWeek - 1] += $invoice->grand_total;
+        }
+
+        return array_map("intval", $dailyIncome);
+    }
+
+    /**
+     * Get weekly income for monthly periods (4 weeks)
      */
     private function getWeeklyIncome($startDate, $endDate)
     {
@@ -324,6 +424,32 @@ class StatisticsController extends Controller
         }
 
         return array_map("intval", $weeklyIncome);
+    }
+
+    /**
+     * Get monthly income for yearly period (12 months)
+     */
+    private function getMonthlyIncome($startDate, $endDate)
+    {
+        // Initialize 12 months
+        $monthlyIncome = array_fill(0, 12, 0);
+
+        $invoices = Invoice::whereBetween("issue_date", [$startDate, $endDate])
+            ->whereNotIn("status", [
+                "cancelled",
+                "draft",
+                "dibatalkan",
+                "konsep",
+            ])
+            ->select("issue_date", "grand_total")
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            $month = Carbon::parse($invoice->issue_date)->month; // 1=January, 12=December
+            $monthlyIncome[$month - 1] += $invoice->grand_total;
+        }
+
+        return array_map("intval", $monthlyIncome);
     }
 
     /**

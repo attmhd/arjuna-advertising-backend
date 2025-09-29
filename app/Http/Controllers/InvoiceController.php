@@ -90,7 +90,7 @@ class InvoiceController extends Controller
             "customer_phone" => "required|string",
             "description" => "required|string",
             "source" => "required|string",
-            "due_date" => "required|date",
+            "due_date" => "nullable|date",
             "status" => "required|string",
             "items" => "required|array",
             "items.*.inventory_id" => "required|exists:inventory,id",
